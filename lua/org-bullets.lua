@@ -2,7 +2,7 @@ local M = {}
 
 local api = vim.api
 
-local NAMESPACE = api.nvim_create_namespace("org-bullets")
+local NAMESPACE = api.nvim_create_namespace("markdown-bullets")
 local org_headline_hl = "OrgHeadlineLevel"
 
 local list_groups = {
@@ -141,11 +141,11 @@ end
 local function get_ts_positions(bufnr, start_row, end_row, root)
   local positions = {}
   local query = vim.treesitter.parse_query(
-    "org",
+    "markdown",
     [[
       (stars) @stars
       ((bullet) @bullet
-        (#match? @bullet "[-\*\+]"))
+        (#match? @bullet "[-\#\+]"))
 
       (checkbox "[ ]") @org_checkbox
       (checkbox status: (expr "str") @_org_checkbox_done_str (#any-of? @_org_checkbox_done_str "x" "X")) @org_checkbox_done
