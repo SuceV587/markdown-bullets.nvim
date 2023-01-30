@@ -5,38 +5,39 @@ local api = vim.api
 local NAMESPACE = api.nvim_create_namespace("markdown-bullets")
 local org_headline_hl = "OrgHeadlineLevel"
 
-function print_r ( t )  
-    local print_r_cache={}
-    local function sub_print_r(t,indent)
-        if (print_r_cache[tostring(t)]) then
-            print(indent.."*"..tostring(t))
-        else
-            print_r_cache[tostring(t)]=true
-            if (type(t)=="table") then
-                for pos,val in pairs(t) do
-                    if (type(val)=="table") then
-                        print(indent.."["..pos.."] => "..tostring(t).." {")
-                        sub_print_r(val,indent..string.rep(" ",string.len(pos)+8))
-                        print(indent..string.rep(" ",string.len(pos)+6).."}")
-                    elseif (type(val)=="string") then
-                        print(indent.."["..pos..'] => "'..val..'"')
-                    else
-                        print(indent.."["..pos.."] => "..tostring(val))
-                    end
-                end
-            else
-                print(indent..tostring(t))
-            end
-        end
-    end
-    if (type(t)=="table") then
-        print(tostring(t).." {")
-        sub_print_r(t,"  ")
-        print("}")
+function print_r(t)
+  local print_r_cache = {}
+  local function sub_print_r(t, indent)
+    if (print_r_cache[tostring(t)]) then
+      print(indent .. "*" .. tostring(t))
     else
-        sub_print_r(t,"  ")
+      print_r_cache[tostring(t)] = true
+      if (type(t) == "table") then
+        for pos, val in pairs(t) do
+          if (type(val) == "table") then
+            print(indent .. "[" .. pos .. "] => " .. tostring(t) .. " {")
+            sub_print_r(val, indent .. string.rep(" ", string.len(pos) + 8))
+            print(indent .. string.rep(" ", string.len(pos) + 6) .. "}")
+          elseif (type(val) == "string") then
+            print(indent .. "[" .. pos .. '] => "' .. val .. '"')
+          else
+            print(indent .. "[" .. pos .. "] => " .. tostring(val))
+          end
+        end
+      else
+        print(indent .. tostring(t))
+      end
     end
-    print()
+  end
+
+  if (type(t) == "table") then
+    print(tostring(t) .. " {")
+    sub_print_r(t, "  ")
+    print("}")
+  else
+    sub_print_r(t, "  ")
+  end
+  print()
 end
 
 local list_groups = {
@@ -53,6 +54,7 @@ local defaults = {
   show_current_line = false,
   symbols = {
     headlines = { "◉", "○", "✸", "✿" },
+    headlinesTable = { "◉", "○", "✸", "✿" },
     checkboxes = {
       half = { "", "OrgTSCheckboxHalfChecked" },
       done = { "✓", "OrgDone" },
@@ -122,6 +124,17 @@ local markers = {
     local symbol = add_symbol_padding("•", (#str - 1), true)
     return { { symbol, list_groups[vim.trim(str)] } }
   end,
+
+  headlines_marker = function (str,conf)
+    
+    local level = #str <= 0 and 0 or #str
+    local symbolTable = conf.symbols.headlinesTable
+    local symbolMark =symbolTable[level] or symbolTable[1]
+    local symbol = add_symbol_padding(symbolMark, (#str - 0), true)
+
+    return { { symbol, list_groups[vim.trim(str)] } }
+  end,
+
 }
 
 ---Set an extmark (safely)
@@ -157,7 +170,7 @@ local function create_position(bufnr, name, node)
   local row1, col1, row2, col2 = node:range()
   return {
     name = name,
-    type = type,
+    type = name == "headlines_marker" and "headlines_marker" or type,
     item = vim.treesitter.get_node_text(node, bufnr),
     start_row = row1,
     start_col = col1,
@@ -177,10 +190,15 @@ local function get_ts_positions(bufnr, start_row, end_row, root)
   local query = vim.treesitter.parse_query(
     "markdown",
     [[
-      (atx_h1_marker) @starts
+      (atx_h1_marker) @headlines_marker
+      (atx_h2_marker) @headlines_marker
+      (atx_h3_marker) @headlines_marker
+      (atx_h4_marker) @headlines_marker
+      (atx_h5_marker) @headlines_marker
+      (atx_h6_marker) @headlines_marker
     ]]
   )
-  
+
   --[[
   local query = vim.treesitter.parse_query(
     "markdown",
@@ -194,7 +212,7 @@ local function get_ts_positions(bufnr, start_row, end_row, root)
       (checkbox status: (expr "-")) @org_checkbox_half
     --]]
   --[[ ) ]]
-  
+
   for _, match, _ in query:iter_matches(root, bufnr, start_row, end_row) do
     for id, node in pairs(match) do
       local name = query.captures[id]
@@ -203,6 +221,8 @@ local function get_ts_positions(bufnr, start_row, end_row, root)
       end
     end
   end
+
+  print_r(positions)
   return positions
 end
 
