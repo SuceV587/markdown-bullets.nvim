@@ -5,6 +5,40 @@ local api = vim.api
 local NAMESPACE = api.nvim_create_namespace("markdown-bullets")
 local org_headline_hl = "OrgHeadlineLevel"
 
+function print_r ( t )  
+    local print_r_cache={}
+    local function sub_print_r(t,indent)
+        if (print_r_cache[tostring(t)]) then
+            print(indent.."*"..tostring(t))
+        else
+            print_r_cache[tostring(t)]=true
+            if (type(t)=="table") then
+                for pos,val in pairs(t) do
+                    if (type(val)=="table") then
+                        print(indent.."["..pos.."] => "..tostring(t).." {")
+                        sub_print_r(val,indent..string.rep(" ",string.len(pos)+8))
+                        print(indent..string.rep(" ",string.len(pos)+6).."}")
+                    elseif (type(val)=="string") then
+                        print(indent.."["..pos..'] => "'..val..'"')
+                    else
+                        print(indent.."["..pos.."] => "..tostring(val))
+                    end
+                end
+            else
+                print(indent..tostring(t))
+            end
+        end
+    end
+    if (type(t)=="table") then
+        print(tostring(t).." {")
+        sub_print_r(t,"  ")
+        print("}")
+    else
+        sub_print_r(t,"  ")
+    end
+    print()
+end
+
 local list_groups = {
   ["-"] = "OrgHeadlineLevel1",
   ["+"] = "OrgHeadlineLevel2",
@@ -143,6 +177,14 @@ local function get_ts_positions(bufnr, start_row, end_row, root)
   local query = vim.treesitter.parse_query(
     "markdown",
     [[
+      (atx_h1_marker) @starts
+    ]]
+  )
+  
+  --[[
+  local query = vim.treesitter.parse_query(
+    "markdown",
+    [[
       (stars) @stars
       ((bullet) @bullet
         (#match? @bullet "[-\#\+]"))
@@ -150,8 +192,9 @@ local function get_ts_positions(bufnr, start_row, end_row, root)
       (checkbox "[ ]") @org_checkbox
       (checkbox status: (expr "str") @_org_checkbox_done_str (#any-of? @_org_checkbox_done_str "x" "X")) @org_checkbox_done
       (checkbox status: (expr "-")) @org_checkbox_half
-    ]]
-  )
+    --]]
+  --[[ ) ]]
+  
   for _, match, _ in query:iter_matches(root, bufnr, start_row, end_row) do
     for id, node in pairs(match) do
       local name = query.captures[id]
@@ -200,7 +243,7 @@ local get_parser = (function()
     if parsers[bufnr] then
       return parsers[bufnr]
     end
-    parsers[bufnr] = vim.treesitter.get_parser(bufnr, "org", {})
+    parsers[bufnr] = vim.treesitter.get_parser(bufnr, "markdown", {})
     return parsers[bufnr]
   end
 end)()
@@ -240,7 +283,7 @@ function M.setup(conf)
       return true
     end,
     on_win = function(_, _, bufnr, topline, botline)
-      if vim.bo[bufnr].filetype ~= "org" then
+      if vim.bo[bufnr].filetype ~= "markdown" then
         return false
       end
       local positions = get_mark_positions(bufnr, topline, botline)
